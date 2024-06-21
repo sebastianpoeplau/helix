@@ -507,6 +507,7 @@ impl MappableCommand {
         command_palette, "Open command palette",
         goto_word, "Jump to a two-character label",
         extend_to_word, "Extend to a two-character label",
+        rust_analyzer_expand_macro, "Expand Rust macro",
     );
 }
 

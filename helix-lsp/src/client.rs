@@ -10,12 +10,12 @@ use helix_loader::{self, VERSION_AND_GIT_HASH};
 use helix_stdx::path;
 use lsp::{
     notification::DidChangeWorkspaceFolders, CodeActionCapabilityResolveSupport,
-    DidChangeWorkspaceFoldersParams, OneOf, PositionEncodingKind, SignatureHelp, Url,
-    WorkspaceFolder, WorkspaceFoldersChangeEvent,
+    DidChangeWorkspaceFoldersParams, OneOf, PositionEncodingKind, SignatureHelp,
+    TextDocumentPositionParams, Url, WorkspaceFolder, WorkspaceFoldersChangeEvent,
 };
 use lsp_types as lsp;
 use parking_lot::Mutex;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
@@ -42,6 +42,28 @@ fn workspace_for_uri(uri: lsp::Url) -> WorkspaceFolder {
             .unwrap_or_default(),
         uri,
     }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RustAnalyzerExpandMacroParams {
+    #[serde(flatten)]
+    text_document_position: TextDocumentPositionParams,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
+pub struct RustAnalyzerExpandMacro {
+    pub name: String,
+    pub expansion: String,
+}
+
+#[derive(Debug)]
+struct RustAnalyzerExpandMacroRequest {}
+
+impl lsp::request::Request for RustAnalyzerExpandMacroRequest {
+    type Params = RustAnalyzerExpandMacroParams;
+    type Result = RustAnalyzerExpandMacro;
+    const METHOD: &'static str = "rust-analyzer/expandMacro";
 }
 
 #[derive(Debug)]
@@ -1540,5 +1562,20 @@ impl Client {
         self.notify::<lsp::notification::DidChangeWatchedFiles>(lsp::DidChangeWatchedFilesParams {
             changes,
         })
+    }
+
+    pub fn rust_analyzer_expand_macro(
+        &self,
+        text_document: lsp::TextDocumentIdentifier,
+        position: lsp::Position,
+    ) -> impl Future<Output = Result<Value>> {
+        let params = RustAnalyzerExpandMacroParams {
+            text_document_position: lsp::TextDocumentPositionParams {
+                text_document,
+                position,
+            },
+        };
+
+        self.call::<RustAnalyzerExpandMacroRequest>(params)
     }
 }

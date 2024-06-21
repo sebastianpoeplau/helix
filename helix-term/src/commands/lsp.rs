@@ -1328,3 +1328,34 @@ fn compute_inlay_hints_for_view(
 
     Some(callback)
 }
+
+pub fn rust_analyzer_expand_macro(cx: &mut Context) {
+    let (view, doc) = current_ref!(cx.editor);
+
+    let Some(language_server) = doc.language_servers().find(|&server| server.name() == "rust-analyzer") else {
+        cx.editor.set_error("Rust-analyzer not active");
+        return;
+    };
+
+    let future = language_server.rust_analyzer_expand_macro(
+        doc.identifier(),
+        doc.position(view.id, language_server.offset_encoding()),
+    );
+
+    cx.callback(
+        future,
+        |editor, compositor, response: Option<helix_lsp::RustAnalyzerExpandMacro>| {
+            if let Some(expand) = response {
+                let markdown_text = format!(
+                    "Expansion of macro `{}`:\n\n```rust\n{}\n```",
+                    expand.name, expand.expansion
+                );
+                let contents = ui::Markdown::new(markdown_text, editor.syn_loader.clone());
+                let popup = Popup::new("rustMacroExpansion", contents);
+                compositor.replace_or_push("rustMacroExpansion", popup);
+            } else {
+                editor.set_error("Failed to expand");
+            }
+        },
+    );
+}
